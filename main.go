@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/samber/lo"
@@ -53,6 +54,7 @@ func dosome(ctx context.Context, q *qbittorrent.Qbit, banPeerIdReg *regexp.Regex
 
 	needBanMapL := sync.Mutex{}
 	expiredTime := time.Now().Add(2 * time.Hour)
+	needChange := atomic.Bool{}
 
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(5)
@@ -72,6 +74,7 @@ func dosome(ctx context.Context, q *qbittorrent.Qbit, banPeerIdReg *regexp.Regex
 					needBanMap[v.IP] = expiredTime
 					needBanMapL.Unlock()
 					log.Println(v.IP, v.PeerIdClient, v.Client)
+					needChange.Store(true)
 				}
 			}
 			return nil
@@ -90,9 +93,14 @@ func dosome(ctx context.Context, q *qbittorrent.Qbit, banPeerIdReg *regexp.Regex
 	for k, v := range needBanMap {
 		if now.After(v) {
 			delete(needBanMap, k)
+			needChange.Store(true)
 			continue
 		}
 		ips = append(ips, k)
+	}
+
+	if !needChange.Load() {
+		return
 	}
 
 	err = q.BanIps(ctx, ips)
