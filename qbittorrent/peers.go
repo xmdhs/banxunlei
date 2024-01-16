@@ -49,7 +49,7 @@ func (q *Qbit) GetAllTorrents(ctx context.Context) ([]TorrentsInfo, error) {
 
 type Peer struct {
 	IP           string `json:"ip"`
-	Port         string `json:"port"`
+	Port         int    `json:"port"`
 	PeerIdClient string `json:"peer_id_client"`
 }
 
