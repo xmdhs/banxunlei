@@ -71,7 +71,7 @@ func dosome(ctx context.Context, q *qbittorrent.Qbit, banPeerIdReg *regexp.Regex
 					needBanMapL.Lock()
 					needBanMap[v.IP] = expiredTime
 					needBanMapL.Unlock()
-					log.Println(v.IP, v.PeerIdClient)
+					log.Println(v.IP, v.PeerIdClient, v.Client)
 				}
 			}
 			return nil

@@ -51,6 +51,7 @@ type Peer struct {
 	IP           string `json:"ip"`
 	Port         int    `json:"port"`
 	PeerIdClient string `json:"peer_id_client"`
+	Client       string `json:"client"`
 }
 
 type torrentPeers struct {
