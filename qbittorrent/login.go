@@ -38,6 +38,7 @@ func Login(ctx context.Context, root string, c http.Client, username, password s
 	if err != nil {
 		return nil, fmt.Errorf("Login: %w", err)
 	}
+	reqs.Header.Add("content-type", "application/x-www-form-urlencoded; charset=UTF-8")
 	rep, err := c.Do(reqs)
 	if err != nil {
 		return nil, fmt.Errorf("Login: %w", err)

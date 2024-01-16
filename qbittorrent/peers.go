@@ -81,11 +81,12 @@ func (q *Qbit) BanIps(ctx context.Context, ip []string) error {
 	v := url.Values{}
 	v.Set("json", string(lo.Must(json.Marshal(p))))
 
-	reps, err := http.NewRequestWithContext(ctx, "POST", lo.Must(url.JoinPath(q.root, "/api/v2/app/setPreferences")), strings.NewReader(v.Encode()))
+	reqs, err := http.NewRequestWithContext(ctx, "POST", lo.Must(url.JoinPath(q.root, "/api/v2/app/setPreferences")), strings.NewReader(v.Encode()))
 	if err != nil {
 		return fmt.Errorf("BanIps: %w", err)
 	}
-	rep, err := q.c.Do(reps)
+	reqs.Header.Add("content-type", "application/x-www-form-urlencoded; charset=UTF-8")
+	rep, err := q.c.Do(reqs)
 	if err != nil {
 		return fmt.Errorf("BanIps: %w", err)
 	}
