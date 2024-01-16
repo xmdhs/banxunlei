@@ -54,7 +54,7 @@ func dosome(ctx context.Context, q *qbittorrent.Qbit, banPeerIdReg *regexp.Regex
 	needBanMapL := sync.Mutex{}
 	expiredTime := time.Now().Add(2 * time.Hour)
 
-	g, ctx := errgroup.WithContext(ctx)
+	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(5)
 	for _, item := range t {
 		item := item
@@ -62,7 +62,7 @@ func dosome(ctx context.Context, q *qbittorrent.Qbit, banPeerIdReg *regexp.Regex
 			continue
 		}
 		g.Go(func() error {
-			p, err := q.GetPeers(ctx, item.Hash)
+			p, err := q.GetPeers(gctx, item.Hash)
 			if err != nil {
 				return err
 			}
