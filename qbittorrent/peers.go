@@ -37,6 +37,7 @@ func getSome[T any](ctx context.Context, path string, c http.Client) (T, error) 
 type TorrentsInfo struct {
 	Hash  string `json:"hash"`
 	State string `json:"state"`
+	Name  string `json:"name"`
 }
 
 func (q *Qbit) GetAllTorrents(ctx context.Context) ([]TorrentsInfo, error) {
