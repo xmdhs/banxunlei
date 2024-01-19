@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"regexp"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -60,10 +59,10 @@ func dosome(ctx context.Context, q *qbittorrent.Qbit, banPeerIdReg, banClientReg
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(5)
 	for _, item := range t {
-		item := item
-		if strings.HasPrefix(item.State, "paused") {
+		if item.UpSpeed == 0 {
 			continue
 		}
+		item := item
 		g.Go(func() error {
 			p, err := q.GetPeers(gctx, item.Hash)
 			if err != nil {
