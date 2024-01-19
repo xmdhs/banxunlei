@@ -2,5 +2,6 @@
     "UserName": "xmdhs",
     "PassWord": "123",
     "Root": "",
-    "BanPeerIdReg": "^-XL.*"
+    "BanPeerIdReg": "^-XL.*",
+    "BanClientReg": "Xunlei"
 }

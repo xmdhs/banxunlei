@@ -37,15 +37,16 @@ func main() {
 	banMap := map[string]time.Time{}
 
 	banPeerIdReg := regexp.MustCompile(c.BanPeerIdReg)
+	banClientReg := regexp.MustCompile(c.BanClientReg)
 	for {
 		ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-		dosome(ctx, q, banPeerIdReg, banMap)
+		dosome(ctx, q, banPeerIdReg, banClientReg, banMap)
 		cancel()
 		time.Sleep(10 * time.Second)
 	}
 }
 
-func dosome(ctx context.Context, q *qbittorrent.Qbit, banPeerIdReg *regexp.Regexp, needBanMap map[string]time.Time) {
+func dosome(ctx context.Context, q *qbittorrent.Qbit, banPeerIdReg, banClientReg *regexp.Regexp, needBanMap map[string]time.Time) {
 	t, err := q.GetAllTorrents(ctx)
 	if err != nil {
 		log.Println(err)
@@ -69,7 +70,7 @@ func dosome(ctx context.Context, q *qbittorrent.Qbit, banPeerIdReg *regexp.Regex
 				return err
 			}
 			for _, v := range p {
-				if banPeerIdReg.MatchString(v.PeerIdClient) {
+				if banPeerIdReg.MatchString(v.PeerIdClient) || banClientReg.MatchString(v.Client) {
 					needBanMapL.Lock()
 					needBanMap[v.IP] = expiredTime
 					needBanMapL.Unlock()

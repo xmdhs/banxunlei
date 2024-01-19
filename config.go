@@ -5,4 +5,5 @@ type config struct {
 	PassWord     string
 	Root         string
 	BanPeerIdReg string
+	BanClientReg string
 }
