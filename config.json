@@ -3,5 +3,5 @@
     "PassWord": "123",
     "Root": "",
     "BanPeerIdReg": "^-XL.*",
-    "BanClientReg": "Xunlei"
+    "BanClientReg": "Xunlei|github.com/anacrolix/torrent"
 }
