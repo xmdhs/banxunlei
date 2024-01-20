@@ -41,6 +41,9 @@ func main() {
 		ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		dosome(ctx, q, banPeerIdReg, banClientReg, banMap)
 		cancel()
+		if len(banMap) == 0 {
+			banMap = map[string]time.Time{}
+		}
 		time.Sleep(10 * time.Second)
 	}
 }
@@ -53,7 +56,7 @@ func dosome(ctx context.Context, q *qbittorrent.Qbit, banPeerIdReg, banClientReg
 	}
 
 	needBanMapL := sync.Mutex{}
-	expiredTime := time.Now().Add(2 * time.Hour)
+	expiredTime := time.Now().Add(12 * time.Hour)
 	needChange := atomic.Bool{}
 
 	g, gctx := errgroup.WithContext(ctx)
@@ -89,7 +92,7 @@ func dosome(ctx context.Context, q *qbittorrent.Qbit, banPeerIdReg, banClientReg
 	}
 
 	ips := []string{}
-	now := time.Now()
+	now := time.Now().Truncate(time.Hour)
 	for k, v := range needBanMap {
 		if now.After(v) {
 			delete(needBanMap, k)
