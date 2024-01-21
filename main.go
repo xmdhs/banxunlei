@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"log"
 	"net/http"
@@ -31,28 +32,48 @@ func main() {
 
 	ctx := context.Background()
 
-	q := lo.Must(qbittorrent.Login(ctx, c.Root, http.Client{Timeout: 10 * time.Second}, c.UserName, c.PassWord))
+	var q *qbittorrent.Qbit
+	_, _, err := lo.AttemptWithDelay(5, 1*time.Second, func(index int, duration time.Duration) error {
+		var err error
+		q, err = qbittorrent.Login(ctx, c.Root, http.Client{Timeout: 10 * time.Second}, c.UserName, c.PassWord)
+		return err
+	})
+	lo.Must0(err)
 
 	banMap := map[string]time.Time{}
 
 	banPeerIdReg := regexp.MustCompile(c.BanPeerIdReg)
 	banClientReg := regexp.MustCompile(c.BanClientReg)
 	for {
-		ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-		dosome(ctx, q, banPeerIdReg, banClientReg, banMap)
-		cancel()
-		if len(banMap) == 0 {
-			banMap = map[string]time.Time{}
-		}
-		time.Sleep(10 * time.Second)
+		func() {
+			sctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+			defer cancel()
+			defer time.Sleep(10 * time.Second)
+			err := scan(sctx, q, banPeerIdReg, banClientReg, banMap)
+			if err != nil {
+				log.Println(err)
+				var ec qbittorrent.ErrStatusNotOk
+				if errors.As(err, &ec) && int(ec) == 403 {
+					log.Println("重新登录")
+					q, err = qbittorrent.Login(ctx, c.Root, http.Client{Timeout: 10 * time.Second}, c.UserName, c.PassWord)
+					if err != nil {
+						log.Println(err)
+					}
+				}
+				return
+			}
+
+			if len(banMap) == 0 {
+				banMap = map[string]time.Time{}
+			}
+		}()
 	}
 }
 
-func dosome(ctx context.Context, q *qbittorrent.Qbit, banPeerIdReg, banClientReg *regexp.Regexp, needBanMap map[string]time.Time) {
+func scan(ctx context.Context, q *qbittorrent.Qbit, banPeerIdReg, banClientReg *regexp.Regexp, needBanMap map[string]time.Time) error {
 	t, err := q.GetAllTorrents(ctx)
 	if err != nil {
-		log.Println(err)
-		return
+		return err
 	}
 
 	needBanMapL := sync.Mutex{}
@@ -87,8 +108,7 @@ func dosome(ctx context.Context, q *qbittorrent.Qbit, banPeerIdReg, banClientReg
 
 	err = g.Wait()
 	if err != nil {
-		log.Println(err)
-		return
+		return err
 	}
 
 	ips := []string{}
@@ -103,12 +123,12 @@ func dosome(ctx context.Context, q *qbittorrent.Qbit, banPeerIdReg, banClientReg
 	}
 
 	if !needChange.Load() {
-		return
+		return nil
 	}
 
 	err = q.BanIps(ctx, ips)
 	if err != nil {
-		log.Println(err)
-		return
+		return err
 	}
+	return nil
 }
