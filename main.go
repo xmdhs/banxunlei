@@ -80,6 +80,8 @@ func scan(ctx context.Context, q *qbittorrent.Qbit, banPeerIdReg, banClientReg *
 	expiredTime := time.Now().Add(12 * time.Hour)
 	needChange := atomic.Bool{}
 
+	peerIdCheck := peerIdCheck(banPeerIdReg, banClientReg)
+
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(5)
 	for _, item := range t {
@@ -87,18 +89,29 @@ func scan(ctx context.Context, q *qbittorrent.Qbit, banPeerIdReg, banClientReg *
 			continue
 		}
 		item := item
+		progressCheck := progressCheck(item.TotalSize)
 		g.Go(func() error {
 			p, err := q.GetPeers(gctx, item.Hash)
 			if err != nil {
 				return err
 			}
+			setBanIp := func(s string) {
+				needBanMapL.Lock()
+				needBanMap[s] = expiredTime
+				needBanMapL.Unlock()
+				needChange.Store(true)
+			}
+			m := map[string]check{
+				"客户端规则命中": peerIdCheck,
+				"进度规则命中":  progressCheck,
+			}
 			for _, v := range p {
-				if banPeerIdReg.MatchString(v.PeerIdClient) || banClientReg.MatchString(v.Client) {
-					needBanMapL.Lock()
-					needBanMap[v.IP] = expiredTime
-					needBanMapL.Unlock()
-					log.Println(v.IP, v.PeerIdClient, v.Client, item.Name)
-					needChange.Store(true)
+				for k, check := range m {
+					if check(v) {
+						setBanIp(v.IP)
+						log.Println(v.IP, v.PeerIdClient, v.Client, item.Name, k)
+						continue
+					}
 				}
 			}
 			return nil

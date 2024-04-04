@@ -35,10 +35,11 @@ func getSome[T any](ctx context.Context, path string, c http.Client) (T, error) 
 }
 
 type TorrentsInfo struct {
-	Hash    string `json:"hash"`
-	State   string `json:"state"`
-	Name    string `json:"name"`
-	UpSpeed int    `json:"upspeed"`
+	Hash      string `json:"hash"`
+	State     string `json:"state"`
+	Name      string `json:"name"`
+	UpSpeed   int    `json:"upspeed"`
+	TotalSize int    `json:"total_size"`
 }
 
 func (q *Qbit) GetAllTorrents(ctx context.Context) ([]TorrentsInfo, error) {
@@ -50,10 +51,12 @@ func (q *Qbit) GetAllTorrents(ctx context.Context) ([]TorrentsInfo, error) {
 }
 
 type Peer struct {
-	IP           string `json:"ip"`
-	Port         int    `json:"port"`
-	PeerIdClient string `json:"peer_id_client"`
-	Client       string `json:"client"`
+	IP           string  `json:"ip"`
+	Port         int     `json:"port"`
+	PeerIdClient string  `json:"peer_id_client"`
+	Client       string  `json:"client"`
+	Progress     float64 `json:"progress"`
+	Uploaded     int     `json:"uploaded"`
 }
 
 type torrentPeers struct {
