@@ -109,8 +109,9 @@ func scan(ctx context.Context, q *qbittorrent.Qbit, banPeerIdReg, banClientReg *
 				for k, check := range m {
 					if check(v) {
 						setBanIp(v.IP)
-						log.Println(v.IP, v.PeerIdClient, v.Client, item.Name, k)
-						continue
+						log.Printf("ip: %v peerID: %v client: %v name: %v reason: %v uploaded: %v progress: %v totalSize: %v", v.IP, v.PeerIdClient,
+							v.Client, item.Name, k, v.Uploaded, v.Progress, item.TotalSize)
+						break
 					}
 				}
 			}
