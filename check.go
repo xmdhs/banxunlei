@@ -22,7 +22,7 @@ func progressCheck(totalSize int) check {
 		if p.Uploaded < max(min(100*1000*1000, int(float64(totalSize)*0.1)), 20*1000*1000) {
 			return false
 		}
-		if p.Uploaded+50*1000*1000 > totalSize {
+		if p.Uploaded > totalSize+50*1000*1000 {
 			return true
 		}
 		if float64(p.Uploaded) > p.Progress*float64(totalSize)+min(300*1000*1000, float64(totalSize)*0.1) {
