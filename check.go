@@ -16,6 +16,9 @@ func peerIdCheck(banPeerIdReg, banClientReg *regexp.Regexp) check {
 
 func progressCheck(totalSize int) check {
 	return func(p qbittorrent.Peer) bool {
+		if p.PeerIdClient == "" {
+			return false
+		}
 		if p.Uploaded < max(min(100*1000*1000, int(float64(totalSize)*0.1)), 20*1000*1000) {
 			return false
 		}
