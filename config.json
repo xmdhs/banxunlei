@@ -2,6 +2,6 @@
     "UserName": "xmdhs",
     "PassWord": "123",
     "Root": "",
-    "BanPeerIdReg": "^-(XL|DT).*",
+    "BanPeerIdReg": "^-(XL|DT|HP).*",
     "BanClientReg": "Xunlei|github.com/anacrolix/torrent|dt/torrent|Taipei-Torrent"
 }
