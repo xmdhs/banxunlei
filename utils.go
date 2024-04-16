@@ -10,6 +10,7 @@ func getPrefix(ip string) (netip.Prefix, error) {
 	if err != nil {
 		return netip.Prefix{}, fmt.Errorf("getPrefix: %w", err)
 	}
+	ipa = ipa.Unmap()
 	if ipa.Is6() {
 		return ipa.Prefix(48)
 	}
