@@ -7,6 +7,7 @@ import (
 	"flag"
 	"log"
 	"net/http"
+	"net/netip"
 	"os"
 	"regexp"
 	"sync"
@@ -41,15 +42,25 @@ func main() {
 	lo.Must0(err)
 
 	banMap := map[string]time.Time{}
+	banIpCidMap := map[netip.Prefix]time.Time{}
 
 	banPeerIdReg := regexp.MustCompile(c.BanPeerIdReg)
 	banClientReg := regexp.MustCompile(c.BanClientReg)
+	ban := ban{
+		q:                q,
+		banPeerIdReg:     banPeerIdReg,
+		banClientReg:     banClientReg,
+		needBanMap:       banMap,
+		needBanIpCidrMap: banIpCidMap,
+	}
+
 	for {
 		func() {
 			sctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 			defer cancel()
 			defer time.Sleep(10 * time.Second)
-			err := scan(sctx, q, banPeerIdReg, banClientReg, banMap)
+
+			err := ban.scan(sctx)
 			if err != nil {
 				log.Println(err)
 				var ec qbittorrent.ErrStatusNotOk
@@ -70,8 +81,15 @@ func main() {
 	}
 }
 
-func scan(ctx context.Context, q *qbittorrent.Qbit, banPeerIdReg, banClientReg *regexp.Regexp, needBanMap map[string]time.Time) error {
-	t, err := q.GetAllTorrents(ctx)
+type ban struct {
+	q                          *qbittorrent.Qbit
+	banPeerIdReg, banClientReg *regexp.Regexp
+	needBanMap                 map[string]time.Time
+	needBanIpCidrMap           map[netip.Prefix]time.Time
+}
+
+func (b *ban) scan(ctx context.Context) error {
+	t, err := b.q.GetAllTorrents(ctx)
 	if err != nil {
 		return err
 	}
@@ -80,7 +98,8 @@ func scan(ctx context.Context, q *qbittorrent.Qbit, banPeerIdReg, banClientReg *
 	expiredTime := time.Now().Add(12 * time.Hour)
 	needChange := atomic.Bool{}
 
-	peerIdCheck := peerIdCheck(banPeerIdReg, banClientReg)
+	peerIdCheck := peerIdCheck(b.banPeerIdReg, b.banClientReg)
+	checkIpCidr := checkIpCidr(b.needBanIpCidrMap)
 
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(5)
@@ -91,24 +110,34 @@ func scan(ctx context.Context, q *qbittorrent.Qbit, banPeerIdReg, banClientReg *
 		item := item
 		progressCheck := progressCheck(item.TotalSize)
 		g.Go(func() error {
-			p, err := q.GetPeers(gctx, item.Hash)
+			p, err := b.q.GetPeers(gctx, item.Hash)
 			if err != nil {
 				return err
 			}
-			setBanIp := func(s string) {
+			setBanIp := func(s string) error {
 				needBanMapL.Lock()
-				needBanMap[s] = expiredTime
+				b.needBanMap[s] = expiredTime
+				addr, err := getPrefix(s)
+				if err != nil {
+					return err
+				}
+				b.needBanIpCidrMap[addr] = expiredTime
 				needBanMapL.Unlock()
 				needChange.Store(true)
+				return nil
 			}
 			m := map[string]check{
 				"客户端规则命中": peerIdCheck,
 				"进度规则命中":  progressCheck,
+				"ip 段黑名单": checkIpCidr,
 			}
 			for _, v := range p {
 				for k, check := range m {
 					if check(v) {
-						setBanIp(v.IP)
+						err = setBanIp(v.IP)
+						if err != nil {
+							log.Println(err)
+						}
 						log.Printf("ip: %v peerID: %v client: %v name: %v reason: %v uploaded: %v progress: %v totalSize: %v", v.IP, v.PeerIdClient,
 							v.Client, item.Name, k, v.Uploaded, v.Progress, item.TotalSize)
 						break
@@ -127,20 +156,26 @@ func scan(ctx context.Context, q *qbittorrent.Qbit, banPeerIdReg, banClientReg *
 
 	ips := []string{}
 	now := time.Now().Truncate(time.Hour)
-	for k, v := range needBanMap {
+	for k, v := range b.needBanMap {
 		if now.After(v) {
-			delete(needBanMap, k)
+			delete(b.needBanMap, k)
 			needChange.Store(true)
 			continue
 		}
 		ips = append(ips, k)
+	}
+	for k, v := range b.needBanIpCidrMap {
+		if now.After(v) {
+			delete(b.needBanIpCidrMap, k)
+			continue
+		}
 	}
 
 	if !needChange.Load() {
 		return nil
 	}
 
-	err = q.BanIps(ctx, ips)
+	err = b.q.BanIps(ctx, ips)
 	if err != nil {
 		return err
 	}
