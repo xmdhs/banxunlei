@@ -47,7 +47,6 @@ func main() {
 	banPeerIdReg := regexp.MustCompile(c.BanPeerIdReg)
 	banClientReg := regexp.MustCompile(c.BanClientReg)
 	ban := ban{
-		q:                q,
 		banPeerIdReg:     banPeerIdReg,
 		banClientReg:     banClientReg,
 		needBanMap:       banMap,
@@ -60,7 +59,7 @@ func main() {
 			defer cancel()
 			defer time.Sleep(10 * time.Second)
 
-			err := ban.scan(sctx)
+			err := ban.scan(sctx, q)
 			if err != nil {
 				log.Println(err)
 				var ec qbittorrent.ErrStatusNotOk
@@ -82,14 +81,13 @@ func main() {
 }
 
 type ban struct {
-	q                          *qbittorrent.Qbit
 	banPeerIdReg, banClientReg *regexp.Regexp
 	needBanMap                 map[string]time.Time
 	needBanIpCidrMap           map[netip.Prefix]time.Time
 }
 
-func (b *ban) scan(ctx context.Context) error {
-	t, err := b.q.GetAllTorrents(ctx)
+func (b *ban) scan(ctx context.Context, q *qbittorrent.Qbit) error {
+	t, err := q.GetAllTorrents(ctx)
 	if err != nil {
 		return err
 	}
@@ -110,7 +108,7 @@ func (b *ban) scan(ctx context.Context) error {
 		item := item
 		progressCheck := progressCheck(item.TotalSize)
 		g.Go(func() error {
-			p, err := b.q.GetPeers(gctx, item.Hash)
+			p, err := q.GetPeers(gctx, item.Hash)
 			if err != nil {
 				return err
 			}
@@ -175,7 +173,7 @@ func (b *ban) scan(ctx context.Context) error {
 		return nil
 	}
 
-	err = b.q.BanIps(ctx, ips)
+	err = q.BanIps(ctx, ips)
 	if err != nil {
 		return err
 	}
