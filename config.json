@@ -4,5 +4,5 @@
     "Root": "",
     "BanPeerIdReg": "^-(XL|DT|HP).*",
     "BanClientReg": "Xunlei|github.com/anacrolix/torrent|dt/torrent|Taipei-Torrent",
-    "ExternalBanListURL": "https://raw.githubusercontent.com/PBH-BTN/BTN-Collected-Rules/main/combine/all.txt"
+    "ExternalBanListURL": "https://bcr.pbh-btn.ghorg.ghostchu-services.top/combine/all.txt"
 }
