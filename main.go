@@ -107,7 +107,7 @@ type ban struct {
 	banPeerIdReg, banClientReg *regexp.Regexp
 	needBanMap                 map[string]time.Time
 	needBanIpCidrMap           map[netip.Prefix]time.Time
-	externalBanIpCidr          atomic.Pointer[map[netip.Prefix]struct{}]
+	externalBanIpCidr          atomic.Pointer[[]netip.Prefix]
 }
 
 func (b *ban) update(ctx context.Context, url string, c http.Client) error {
@@ -121,15 +121,19 @@ func (b *ban) update(ctx context.Context, url string, c http.Client) error {
 			return err
 		}
 		defer reps.Body.Close()
-		set := map[netip.Prefix]struct{}{}
+		list := []netip.Prefix{}
 		s := bufio.NewScanner(reps.Body)
 		for s.Scan() {
-			p, err := netip.ParsePrefix(s.Text())
-			if err == nil {
-				set[p] = struct{}{}
+			t := s.Text()
+			p, err := netip.ParsePrefix(t)
+			if err != nil {
+				p, _ = getPrefix(t)
+			}
+			if p.IsValid() {
+				list = append(list, p)
 			}
 		}
-		b.externalBanIpCidr.Store(&set)
+		b.externalBanIpCidr.Store(&list)
 		return nil
 	})
 	return err
@@ -147,7 +151,7 @@ func (b *ban) scan(ctx context.Context, q *qbittorrent.Qbit) error {
 
 	peerIdCheck := peerIdCheck(b.banPeerIdReg, b.banClientReg)
 	checkIpCidrFunc := checkIpCidr(b.needBanIpCidrMap)
-	externalIpCidr := checkIpCidr(*b.externalBanIpCidr.Load())
+	externalIpCidr := checkIpCidrList(*b.externalBanIpCidr.Load())
 
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(5)
@@ -179,8 +183,8 @@ func (b *ban) scan(ctx context.Context, q *qbittorrent.Qbit) error {
 				check check
 			}{
 				{name: "客户端规则命中", check: peerIdCheck},
-				{name: "外部 ip 段黑名单", check: externalIpCidr},
 				{name: "ip 段黑名单", check: checkIpCidrFunc},
+				{name: "外部 ip 段黑名单", check: externalIpCidr},
 				{name: "进度规则命中", check: progressCheck},
 			}
 			for _, v := range p {

@@ -43,3 +43,18 @@ func checkIpCidr[T any](m map[netip.Prefix]T) check {
 		return ok
 	}
 }
+
+func checkIpCidrList(list []netip.Prefix) check {
+	return func(p qbittorrent.Peer) bool {
+		ipa, err := netip.ParseAddr(p.IP)
+		if err != nil {
+			return true
+		}
+		for _, v := range list {
+			if v.Contains(ipa) {
+				return true
+			}
+		}
+		return false
+	}
+}
