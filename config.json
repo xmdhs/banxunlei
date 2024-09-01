@@ -3,6 +3,6 @@
     "PassWord": "123",
     "Root": "",
     "BanPeerIdReg": "^-(XL|DT|HP).*",
-    "BanClientReg": "Xunlei|github.com/anacrolix/torrent|dt/torrent|Taipei-Torrent|go.torrent dev|Gopeed dev",
+    "BanClientReg": "Xunlei|anacrolix/torrent|dt/torrent|Taipei-Torrent|go.torrent dev|Gopeed dev",
     "ExternalBanListURL": "https://bcr.pbh-btn.ghorg.ghostchu-services.top/combine/all.txt"
 }
