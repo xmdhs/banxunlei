@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -52,6 +53,27 @@ func main() {
 		needBanMap:       banMap,
 		needBanIpCidrMap: banIpCidMap,
 	}
+	client := http.Client{Timeout: 10 * time.Second}
+
+	lo.Must0(ban.update(ctx, c.ExternalBanListURL, client))
+
+	go func() {
+		t := time.NewTicker(12 * time.Hour)
+		defer t.Stop()
+		for {
+			select {
+			case <-t.C:
+				err := ban.update(ctx, c.ExternalBanListURL, client)
+				if err != nil {
+					log.Println(err)
+					continue
+				}
+				log.Println("更新外部列表成功")
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 
 	for {
 		func() {
@@ -65,7 +87,7 @@ func main() {
 				var ec qbittorrent.ErrStatusNotOk
 				if errors.As(err, &ec) && int(ec) == 403 {
 					log.Println("重新登录")
-					q, err = qbittorrent.Login(ctx, c.Root, http.Client{Timeout: 10 * time.Second}, c.UserName, c.PassWord)
+					q, err = qbittorrent.Login(ctx, c.Root, client, c.UserName, c.PassWord)
 					if err != nil {
 						log.Println(err)
 					}
@@ -84,6 +106,32 @@ type ban struct {
 	banPeerIdReg, banClientReg *regexp.Regexp
 	needBanMap                 map[string]time.Time
 	needBanIpCidrMap           map[netip.Prefix]time.Time
+	externalBanIpCidr          atomic.Pointer[map[netip.Prefix]struct{}]
+}
+
+func (b *ban) update(ctx context.Context, url string, c http.Client) error {
+	_, _, err := lo.AttemptWithDelay(5, 1*time.Second, func(index int, duration time.Duration) error {
+		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+		if err != nil {
+			return err
+		}
+		reps, err := c.Do(req)
+		if err != nil {
+			return err
+		}
+		defer reps.Body.Close()
+		set := map[netip.Prefix]struct{}{}
+		s := bufio.NewScanner(reps.Body)
+		for s.Scan() {
+			p, err := netip.ParsePrefix(s.Text())
+			if err == nil {
+				set[p] = struct{}{}
+			}
+		}
+		b.externalBanIpCidr.Store(&set)
+		return nil
+	})
+	return err
 }
 
 func (b *ban) scan(ctx context.Context, q *qbittorrent.Qbit) error {
@@ -97,7 +145,8 @@ func (b *ban) scan(ctx context.Context, q *qbittorrent.Qbit) error {
 	needChange := atomic.Bool{}
 
 	peerIdCheck := peerIdCheck(b.banPeerIdReg, b.banClientReg)
-	checkIpCidr := checkIpCidr(b.needBanIpCidrMap)
+	checkIpCidrFunc := checkIpCidr(b.needBanIpCidrMap)
+	externalIpCidr := checkIpCidr(*b.externalBanIpCidr.Load())
 
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(5)
@@ -124,20 +173,24 @@ func (b *ban) scan(ctx context.Context, q *qbittorrent.Qbit) error {
 				needChange.Store(true)
 				return nil
 			}
-			m := map[string]check{
-				"客户端规则命中": peerIdCheck,
-				"进度规则命中":  progressCheck,
-				"ip 段黑名单": checkIpCidr,
+			checkList := []struct {
+				name  string
+				check check
+			}{
+				{name: "客户端规则命中", check: peerIdCheck},
+				{name: "外部 ip 段黑名单", check: externalIpCidr},
+				{name: "ip 段黑名单", check: checkIpCidrFunc},
+				{name: "进度规则命中", check: progressCheck},
 			}
 			for _, v := range p {
-				for k, check := range m {
-					if check(v) {
+				for _, c := range checkList {
+					if c.check(v) {
 						err = setBanIp(v.IP)
 						if err != nil {
 							log.Println(err)
 						}
 						log.Printf("ip: %v peerID: %v client: %v name: %v reason: %v uploaded: %v progress: %v totalSize: %v", v.IP, v.PeerIdClient,
-							v.Client, item.Name, k, v.Uploaded, v.Progress, item.TotalSize)
+							v.Client, item.Name, c.name, v.Uploaded, v.Progress, item.TotalSize)
 						break
 					}
 				}

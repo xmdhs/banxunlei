@@ -3,7 +3,6 @@ package main
 import (
 	"net/netip"
 	"regexp"
-	"time"
 
 	"github.com/xmdhs/banxunlei/qbittorrent"
 )
@@ -34,7 +33,7 @@ func progressCheck(totalSize int) check {
 	}
 }
 
-func checkIpCidr(m map[netip.Prefix]time.Time) check {
+func checkIpCidr[T any](m map[netip.Prefix]T) check {
 	return func(p qbittorrent.Peer) bool {
 		pre, err := getPrefix(p.IP)
 		if err != nil {
