@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/docker/go-units"
 	"github.com/samber/lo"
 	"github.com/xmdhs/banxunlei/qbittorrent"
 	"golang.org/x/sync/errgroup"
@@ -190,7 +191,7 @@ func (b *ban) scan(ctx context.Context, q *qbittorrent.Qbit) error {
 							log.Println(err)
 						}
 						log.Printf("ip: %v peerID: %v client: %v name: %v reason: %v uploaded: %v progress: %v totalSize: %v", v.IP, v.PeerIdClient,
-							v.Client, item.Name, c.name, v.Uploaded, v.Progress, item.TotalSize)
+							v.Client, item.Name, c.name, units.HumanSize(float64(v.Uploaded)), v.Progress, units.HumanSize(float64(item.TotalSize)))
 						break
 					}
 				}
