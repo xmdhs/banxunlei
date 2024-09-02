@@ -133,6 +133,9 @@ func (b *ban) update(ctx context.Context, url string, c http.Client) error {
 				list = append(list, p)
 			}
 		}
+		if err := s.Err(); err != nil {
+			return err
+		}
 		b.externalBanIpCidr.Store(&list)
 		return nil
 	})
