@@ -7,6 +7,7 @@ import (
 	"errors"
 	"flag"
 	"log"
+	"maps"
 	"net/http"
 	"net/netip"
 	"os"
@@ -153,7 +154,7 @@ func (b *ban) scan(ctx context.Context, q *qbittorrent.Qbit) error {
 	needChange := atomic.Bool{}
 
 	peerIdCheck := peerIdCheck(b.banPeerIdReg, b.banClientReg)
-	checkIpCidrFunc := checkIpCidr(b.needBanIpCidrMap)
+	checkIpCidrFunc := checkIpCidr(maps.Clone(b.needBanIpCidrMap))
 	externalIpCidr := checkIpCidrList(*b.externalBanIpCidr.Load())
 
 	g, gctx := errgroup.WithContext(ctx)
