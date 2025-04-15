@@ -12,6 +12,7 @@ import (
 	"net/netip"
 	"os"
 	"regexp"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -57,7 +58,8 @@ func main() {
 	}
 	client := http.Client{Timeout: 10 * time.Second}
 
-	lo.Must0(ban.update(ctx, c.ExternalBanListURL, client))
+	i := lo.Must(ban.update(ctx, c.ExternalBanListURL, client))
+	log.Printf("加载外部列表成功，%v 条 ip 记录\n", i)
 
 	go func() {
 		t := time.NewTicker(12 * time.Hour)
@@ -65,12 +67,12 @@ func main() {
 		for {
 			select {
 			case <-t.C:
-				err := ban.update(ctx, c.ExternalBanListURL, client)
+				i, err := ban.update(ctx, c.ExternalBanListURL, client)
 				if err != nil {
 					log.Println(err)
 					continue
 				}
-				log.Println("更新外部列表成功")
+				log.Printf("更新外部列表成功，%v 条 ip 记录\n", i)
 			case <-ctx.Done():
 				return
 			}
@@ -111,7 +113,8 @@ type ban struct {
 	externalBanIpCidr          atomic.Pointer[[]netip.Prefix]
 }
 
-func (b *ban) update(ctx context.Context, url string, c http.Client) error {
+func (b *ban) update(ctx context.Context, url string, c http.Client) (int, error) {
+	i := 0
 	_, _, err := lo.AttemptWithDelay(5, 1*time.Second, func(index int, duration time.Duration) error {
 		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 		if err != nil {
@@ -126,6 +129,10 @@ func (b *ban) update(ctx context.Context, url string, c http.Client) error {
 		s := bufio.NewScanner(reps.Body)
 		for s.Scan() {
 			t := s.Text()
+			if strings.HasPrefix(t, "#") {
+				continue
+			}
+			t = strings.TrimSpace(t)
 			p, err := netip.ParsePrefix(t)
 			if err != nil {
 				p, _ = getPrefix(t)
@@ -137,10 +144,11 @@ func (b *ban) update(ctx context.Context, url string, c http.Client) error {
 		if err := s.Err(); err != nil {
 			return err
 		}
+		i = len(list)
 		b.externalBanIpCidr.Store(&list)
 		return nil
 	})
-	return err
+	return i, err
 }
 
 func (b *ban) scan(ctx context.Context, q *qbittorrent.Qbit) error {
